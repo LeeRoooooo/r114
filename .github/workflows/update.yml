@@ -24,7 +24,7 @@ jobs:
           playwright install chromium --with-deps
 
       - name: Generate RSS Feed
-        run: python build_rss.py
+        run: python main.py
 
       - name: Commit and Push feed.xml
         run: |
