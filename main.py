@@ -42,7 +42,6 @@ HEADERS = {
 }
 KST = timezone(timedelta(hours=9))
 
-# 제목으로 오인식되는 UI 버튼, 서브카테고리, 시리즈명 블랙리스트
 BAD_TITLES = {
     "부동산114",
     "부동산R114",
@@ -66,18 +65,14 @@ FULL_DATE_RE = re.compile(r"(?<!\d)(20\d{2})[.\-/년]\s*(0?[1-9]|1[0-2])[.\-/월
 
 def clean_title_text(raw: str) -> str:
     text = html_lib.unescape(raw or "")
-    # 앞뒤 가운뎃점(·), 파이프(|), 대시(-) 등 장식 기호 제거
     text = re.sub(r"^[\s·•\-\|]+|[\s·•\-\|]+$", "", text)
-    # 사이트명 접미사 제거
     text = re.sub(r"\s*[\|\-–]\s*(부동산R114|부동산114|R114).*$", "", text, flags=re.IGNORECASE)
     return re.sub(r"\s+", " ", text).strip()
 
 
 def is_valid_title(title: str) -> bool:
     t = clean_title_text(title)
-    if len(t) < 7:
-        return False
-    if t in BAD_TITLES:
+    if len(t) < 7 or t in BAD_TITLES:
         return False
     if t.startswith("·") or t.startswith("발행"):
         return False
@@ -87,11 +82,12 @@ def is_valid_title(title: str) -> bool:
 
 
 def is_valid_pubdate(pub_str: str) -> bool:
-    """자동 폴백 시각(09:00:00이 아닌 임의의 초 단위 실행 시각)인지 판별합니다."""
-    if not pub_str:
+    if not pub_str or "09:00:00" not in pub_str:
         return False
-    # 정상 파싱된 날짜는 항상 09:00:00 +0900으로 고정 생성됨
-    return "09:00:00" in pub_str
+    # 직전 실행에서 페이지 공통 기준일로 잘못 캐싱된 '15 Nov 2026'은 재검증을 위해 무효화
+    if "15 Nov 2026" in pub_str:
+        return False
+    return True
 
 
 # ================= 1. 기존 feed.xml 정상 캐시 로드 =================
@@ -106,7 +102,6 @@ def load_existing_items(xml_path: Path) -> dict[str, dict]:
             raw_title = (item.findtext("title") or "").strip()
             pure_title = re.sub(r"^\[[^\]]+\]\s*", "", raw_title).strip()
             pub = (item.findtext("pubDate") or "").strip()
-            # 제목과 날짜(09:00:00 고정) 모두 정상인 항목만 캐시 인정
             if guid and is_valid_title(pure_title) and is_valid_pubdate(pub):
                 cache[guid] = {"title": pure_title, "pubDate": pub}
         return cache
@@ -114,7 +109,7 @@ def load_existing_items(xml_path: Path) -> dict[str, dict]:
         return {}
 
 
-# ================= 2. Playwright 통합 수집 (목록 + 상세 JS 렌더링) =================
+# ================= 2. Playwright 통합 수집 =================
 def collect_source_items(context, source: dict, existing_cache: dict[str, dict]) -> list[dict]:
     page = context.new_page()
     url = source["url"]
@@ -127,7 +122,6 @@ def collect_source_items(context, source: dict, existing_cache: dict[str, dict])
     except Exception:
         page.wait_for_timeout(3000)
 
-    # 목록에서 고유 상세 URL과 카드 내부 후보 줄 추출
     raw_links = page.evaluate(
         """({ linkPattern }) => {
             const map = new Map();
@@ -136,9 +130,7 @@ def collect_source_items(context, source: dict, existing_cache: dict[str, dict])
                 const href = a.href.split('?')[0].split('#')[0];
                 const path = new URL(href).pathname.replace(/\\/$/, '');
                 if (path === linkPattern.replace(/\\/$/, '')) continue;
-                if (!map.has(href)) {
-                    map.set(href, href);
-                }
+                if (!map.has(href)) map.set(href, href);
             }
             return Array.from(map.values());
         }""",
@@ -149,7 +141,6 @@ def collect_source_items(context, source: dict, existing_cache: dict[str, dict])
     for href in raw_links[: source["max_items"]]:
         guid_val = hashlib.sha256(href.rstrip("/").encode("utf-8")).hexdigest()[:24]
 
-        # 이미 정상 수집된 항목이면 상세 페이지 방문 생략
         if guid_val in existing_cache:
             cached = existing_cache[guid_val]
             results.append({
@@ -160,7 +151,6 @@ def collect_source_items(context, source: dict, existing_cache: dict[str, dict])
             })
             continue
 
-        # 상세 페이지 직접 렌더링 후 실제 기사 제목과 발행일 추출
         detail = extract_detail_with_playwright(page, href)
         title = detail["title"] if is_valid_title(detail["title"]) else f"부동산R114 {source['category']} 리포트"
         pub_date = parse_pubdate(detail["date"])
@@ -177,7 +167,7 @@ def collect_source_items(context, source: dict, existing_cache: dict[str, dict])
 
 
 def extract_detail_with_playwright(page, url: str) -> dict:
-    """상세 페이지로 이동하여 렌더링 완료 후 헤딩(제목)과 작성일(YYYY.MM.DD)을 추출합니다."""
+    """상세 페이지에서 제목(h1/h2)과 '제목 바로 주변의 실제 작성일'만 정밀 추출합니다."""
     try:
         page.goto(url, wait_until="domcontentloaded", timeout=20000)
         page.wait_for_selector("h1, h2, article, main", timeout=10000)
@@ -187,18 +177,41 @@ def extract_detail_with_playwright(page, url: str) -> dict:
 
     data = page.evaluate(
         """() => {
-            // 1) 헤딩 태그(h1, h2) 우선 탐색 (네비게이션 로고 제외)
+            const dateRegex = /(?<!\\d)(20\\d{2})[.\\-/년]\\s*(0?[1-9]|1[0-2])[.\\-/월]\\s*(0?[1-9]|[12]\\d|3[01])일?(?!\\d)/g;
+
+            // 1) 기사 본문 헤딩 탐색
             const headings = Array.from(document.querySelectorAll('main h1, main h2, article h1, article h2, h1, h2'))
-                .map(el => (el.innerText || '').trim())
-                .filter(t => t.length >= 6 && !t.includes('부동산R114') && !t.includes('부동산114'));
+                .filter(el => {
+                    const t = (el.innerText || '').trim();
+                    return t.length >= 6 && !t.includes('부동산R114') && !t.includes('부동산114');
+                });
 
-            const title = headings.length > 0 ? headings[0] : (document.title || '');
+            const headingEl = headings[0] || null;
+            const title = headingEl ? headingEl.innerText.trim() : (document.title || '');
 
-            // 2) 본문/헤더 영역 텍스트에서 YYYY.MM.DD 또는 YYYY-MM-DD 날짜 탐색
-            const container = document.querySelector('main, article') || document.body;
-            const bodyText = container ? container.innerText : '';
-            const m = bodyText.match(/(?<!\\d)(20\\d{2})[.\\-/년]\\s*(0?[1-9]|1[0-2])[.\\-/월]\\s*(0?[1-9]|[12]\\d|3[01])일?(?!\\d)/);
-            const date = m ? m[0] : '';
+            // 2) <time> 태그나 날짜 전용 클래스가 기사 헤더 영역에 있는지 우선 확인
+            let date = '';
+            const scope = headingEl ? (headingEl.closest('header, section, article, div') || document.body) : document.body;
+            const timeEl = scope.querySelector('time, [class*="date"], [class*="Date"], [class*="day"], [class*="reg"]');
+            if (timeEl) {
+                const m = (timeEl.innerText || '').match(dateRegex);
+                if (m) date = m[0];
+            }
+
+            // 3) 제목 텍스트 위치 기준으로 직전 150자 ~ 직후 400자 이내에서만 작성일 탐색 (상단 공통 위젯/하단 추천글 날짜 배제)
+            if (!date) {
+                const container = document.querySelector('main, article') || document.body;
+                const fullText = container ? container.innerText : '';
+                const idx = title ? fullText.indexOf(title) : -1;
+                const nearText = idx >= 0
+                    ? fullText.slice(Math.max(0, idx - 150), idx + title.length + 400)
+                    : fullText.slice(0, 800);
+
+                const matches = Array.from(nearText.matchAll(dateRegex)).map(m => m[0]);
+                if (matches.length > 0) {
+                    date = matches[0];
+                }
+            }
 
             return { title, date };
         }"""
