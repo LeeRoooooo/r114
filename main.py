@@ -1,10 +1,6 @@
 import hashlib
 import html as html_lib
 import re
-import time
-import urllib.error
-import urllib.parse
-import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 from email.utils import format_datetime
@@ -46,7 +42,7 @@ HEADERS = {
 }
 KST = timezone(timedelta(hours=9))
 
-# 제목으로 잘못 잡히는 사이트명/시리즈명/메타 라벨
+# 제목으로 오인식되는 UI 버튼, 서브카테고리, 시리즈명 블랙리스트
 BAD_TITLES = {
     "부동산114",
     "부동산R114",
@@ -54,6 +50,11 @@ BAD_TITLES = {
     "STORIES",
     "이슈",
     "스토리",
+    "가장 최근 발표",
+    "프롭테크",
+    "시장동향",
+    "정책·제도",
+    "분양·청약",
     "땅의 역사",
     "개발 뒤에 남은 이야기",
     "신도시 이야기",
@@ -61,158 +62,40 @@ BAD_TITLES = {
 }
 
 FULL_DATE_RE = re.compile(r"(?<!\d)(20\d{2})[.\-/년]\s*(0?[1-9]|1[0-2])[.\-/월]\s*(0?[1-9]|[12]\d|3[01])일?(?!\d)")
-ISO_DATE_RE = re.compile(r"(20\d{2}-\d{2}-\d{2})(?:[T\s](\d{2}:\d{2}(?::\d{2})?))?")
+
+
+def clean_title_text(raw: str) -> str:
+    text = html_lib.unescape(raw or "")
+    # 앞뒤 가운뎃점(·), 파이프(|), 대시(-) 등 장식 기호 제거
+    text = re.sub(r"^[\s·•\-\|]+|[\s·•\-\|]+$", "", text)
+    # 사이트명 접미사 제거
+    text = re.sub(r"\s*[\|\-–]\s*(부동산R114|부동산114|R114).*$", "", text, flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def is_valid_title(title: str) -> bool:
-    t = re.sub(r"\s+", " ", title).strip()
-    if len(t) < 6:
+    t = clean_title_text(title)
+    if len(t) < 7:
         return False
     if t in BAD_TITLES:
+        return False
+    if t.startswith("·") or t.startswith("발행"):
         return False
     if re.match(r"^(발행\s*\d+|20\d{2}[.\-/]\d{1,2})$", t):
         return False
     return True
 
 
-def clean_title_text(raw: str) -> str:
-    text = html_lib.unescape(raw or "")
-    # 사이트명 접미사 제거 (예: "기사 제목 | 부동산R114" 또는 "- 부동산114")
-    text = re.sub(r"\s*[\|\-–]\s*(부동산R114|부동산114|R114).*$", "", text, flags=re.IGNORECASE)
-    return re.sub(r"\s+", " ", text).strip()
+def is_valid_pubdate(pub_str: str) -> bool:
+    """자동 폴백 시각(09:00:00이 아닌 임의의 초 단위 실행 시각)인지 판별합니다."""
+    if not pub_str:
+        return False
+    # 정상 파싱된 날짜는 항상 09:00:00 +0900으로 고정 생성됨
+    return "09:00:00" in pub_str
 
 
-# ================= 1. 목록 수집 (Playwright로 고유 상세 URL 확보) =================
-def collect_article_links(source: dict) -> list[dict]:
-    from playwright.sync_api import sync_playwright
-
-    url = source["url"]
-    link_pattern = source["link_pattern"]
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(locale="ko-KR", user_agent=HEADERS["User-Agent"])
-        page = context.new_page()
-        page.goto(url, wait_until="domcontentloaded", timeout=25000)
-
-        try:
-            page.wait_for_selector(f"a[href*='{link_pattern}']", timeout=15000)
-            page.wait_for_timeout(1500)
-        except Exception:
-            page.wait_for_timeout(3000)
-
-        raw_items = page.evaluate(
-            """({ linkPattern }) => {
-                const map = new Map();
-                const anchors = Array.from(document.querySelectorAll(`a[href*="${linkPattern}"]`));
-
-                for (const a of anchors) {
-                    const href = a.href.split('?')[0].split('#')[0];
-                    const path = new URL(href).pathname.replace(/\\/$/, '');
-                    if (path === linkPattern.replace(/\\/$/, '')) continue;
-
-                    // 동일 href를 가리키는 여러 <a>(썸네일, 제목 등) 중 가장 긴 텍스트를 후보로 병합
-                    const txt = (a.innerText || '').trim();
-                    const prev = map.get(href) || { link: href, texts: [] };
-                    if (txt) prev.texts.push(txt);
-                    map.set(href, prev);
-                }
-                return Array.from(map.values());
-            }""",
-            {"linkPattern": link_pattern},
-        )
-        browser.close()
-
-    results = []
-    for item in raw_items:
-        lines = []
-        for block in item["texts"]:
-            lines.extend([ln.strip() for ln in block.split("\n") if ln.strip()])
-
-        # 유효한 제목 후보 추출
-        candidate_title = ""
-        for ln in lines:
-            cleaned = clean_title_text(ln)
-            if is_valid_title(cleaned):
-                candidate_title = cleaned
-                break
-
-        # 목록 텍스트에서 날짜 추출 시도
-        date_str = ""
-        for ln in lines:
-            m = FULL_DATE_RE.search(ln)
-            if m:
-                date_str = m.group(0)
-                break
-
-        results.append({
-            "link": item["link"],
-            "title": candidate_title,
-            "date": date_str,
-        })
-        if len(results) >= source["max_items"]:
-            break
-
-    return results
-
-
-# ================= 2. 상세 페이지 보완 파서 (제목/날짜 누락 시 정밀 추출) =================
-def fetch_detail_meta(url: str) -> tuple[str, str]:
-    """상세 페이지 HTML의 메타 태그(og:title, published_time) 및 본문에서 정확한 제목과 발행일을 추출합니다."""
-    req = urllib.request.Request(url, headers=HEADERS)
-    html = ""
-    for attempt in range(2):
-        try:
-            with urllib.request.urlopen(req, timeout=12) as resp:
-                charset = resp.headers.get_content_charset() or "utf-8"
-                html = resp.read().decode(charset, errors="replace")
-                break
-        except Exception:
-            time.sleep(1)
-
-    if not html:
-        return "", ""
-
-    title = ""
-    # 1) og:title 또는 twitter:title 추출
-    for meta_pat in [
-        r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)["\']',
-        r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:title["\']',
-        r"<title[^>]*>([^<]+)</title>",
-        r"<h1[^>]*>(.*?)</h1>",
-    ]:
-        m = re.search(meta_pat, html, flags=re.IGNORECASE | re.DOTALL)
-        if m:
-            raw_t = re.sub(r"<[^>]+>", " ", m.group(1))
-            cleaned = clean_title_text(raw_t)
-            if is_valid_title(cleaned):
-                title = cleaned
-                break
-
-    date_str = ""
-    # 2) article:published_time / datePublished / JSON-LD 날짜 우선 추출
-    for date_pat in [
-        r'(?:published_time|datePublished|createdAt|regDate)["\'\s:=]+["\']?(20\d{2}-\d{2}-\d{2}(?:[T\s]\d{2}:\d{2}(?::\d{2})?)?)',
-        r"<time[^>]*>([^<]+)</time>",
-    ]:
-        m = re.search(date_pat, html, flags=re.IGNORECASE)
-        if m:
-            date_str = m.group(1).strip()
-            break
-
-    # 3) 본문 텍스트 내 YYYY.MM.DD 패턴 폴백
-    if not date_str:
-        text_only = re.sub(r"<[^>]+>", " ", html)
-        m_full = FULL_DATE_RE.search(text_only)
-        if m_full:
-            date_str = m_full.group(0)
-
-    return title, date_str
-
-
-# ================= 3. RSS 2.0 빌드 및 캐시 재사용 =================
+# ================= 1. 기존 feed.xml 정상 캐시 로드 =================
 def load_existing_items(xml_path: Path) -> dict[str, dict]:
-    """기존 feed.xml에 이미 정상 저장된 (title, pubDate)를 캐싱해 불필요한 재요청을 줄입니다."""
     if not xml_path.exists():
         return {}
     try:
@@ -221,48 +104,126 @@ def load_existing_items(xml_path: Path) -> dict[str, dict]:
         for item in tree.findall("./channel/item"):
             guid = (item.findtext("guid") or "").strip()
             raw_title = (item.findtext("title") or "").strip()
-            # "[이슈] 제목"에서 말머리 제거 후 유효성 검사
             pure_title = re.sub(r"^\[[^\]]+\]\s*", "", raw_title).strip()
             pub = (item.findtext("pubDate") or "").strip()
-            if guid and is_valid_title(pure_title):
+            # 제목과 날짜(09:00:00 고정) 모두 정상인 항목만 캐시 인정
+            if guid and is_valid_title(pure_title) and is_valid_pubdate(pub):
                 cache[guid] = {"title": pure_title, "pubDate": pub}
         return cache
     except Exception:
         return {}
 
 
-def parse_pubdate(raw_date: str, fallback_rfc2822: str | None = None) -> str:
-    text = (raw_date or "").strip()
+# ================= 2. Playwright 통합 수집 (목록 + 상세 JS 렌더링) =================
+def collect_source_items(context, source: dict, existing_cache: dict[str, dict]) -> list[dict]:
+    page = context.new_page()
+    url = source["url"]
+    link_pattern = source["link_pattern"]
 
-    m_iso = ISO_DATE_RE.search(text)
-    if m_iso:
-        d_part, t_part = m_iso.groups()
-        y, m, d = map(int, d_part.split("-"))
-        hh, mm, ss = (9, 0, 0)
-        if t_part:
-            parts = list(map(int, t_part.split(":")))
-            hh, mm = parts[0], parts[1]
-            ss = parts[2] if len(parts) > 2 else 0
-        try:
-            return format_datetime(datetime(y, m, d, hh, mm, ss, tzinfo=KST))
-        except ValueError:
-            pass
+    page.goto(url, wait_until="domcontentloaded", timeout=25000)
+    try:
+        page.wait_for_selector(f"a[href*='{link_pattern}']", timeout=15000)
+        page.wait_for_timeout(1500)
+    except Exception:
+        page.wait_for_timeout(3000)
 
-    m4 = FULL_DATE_RE.search(text)
+    # 목록에서 고유 상세 URL과 카드 내부 후보 줄 추출
+    raw_links = page.evaluate(
+        """({ linkPattern }) => {
+            const map = new Map();
+            const anchors = Array.from(document.querySelectorAll(`a[href*="${linkPattern}"]`));
+            for (const a of anchors) {
+                const href = a.href.split('?')[0].split('#')[0];
+                const path = new URL(href).pathname.replace(/\\/$/, '');
+                if (path === linkPattern.replace(/\\/$/, '')) continue;
+                if (!map.has(href)) {
+                    map.set(href, href);
+                }
+            }
+            return Array.from(map.values());
+        }""",
+        {"linkPattern": link_pattern},
+    )
+
+    results = []
+    for href in raw_links[: source["max_items"]]:
+        guid_val = hashlib.sha256(href.rstrip("/").encode("utf-8")).hexdigest()[:24]
+
+        # 이미 정상 수집된 항목이면 상세 페이지 방문 생략
+        if guid_val in existing_cache:
+            cached = existing_cache[guid_val]
+            results.append({
+                "guid": guid_val,
+                "title": cached["title"],
+                "link": href,
+                "pubDate": cached["pubDate"],
+            })
+            continue
+
+        # 상세 페이지 직접 렌더링 후 실제 기사 제목과 발행일 추출
+        detail = extract_detail_with_playwright(page, href)
+        title = detail["title"] if is_valid_title(detail["title"]) else f"부동산R114 {source['category']} 리포트"
+        pub_date = parse_pubdate(detail["date"])
+
+        results.append({
+            "guid": guid_val,
+            "title": title,
+            "link": href,
+            "pubDate": pub_date,
+        })
+
+    page.close()
+    return results
+
+
+def extract_detail_with_playwright(page, url: str) -> dict:
+    """상세 페이지로 이동하여 렌더링 완료 후 헤딩(제목)과 작성일(YYYY.MM.DD)을 추출합니다."""
+    try:
+        page.goto(url, wait_until="domcontentloaded", timeout=20000)
+        page.wait_for_selector("h1, h2, article, main", timeout=10000)
+        page.wait_for_timeout(1000)
+    except Exception:
+        return {"title": "", "date": ""}
+
+    data = page.evaluate(
+        """() => {
+            // 1) 헤딩 태그(h1, h2) 우선 탐색 (네비게이션 로고 제외)
+            const headings = Array.from(document.querySelectorAll('main h1, main h2, article h1, article h2, h1, h2'))
+                .map(el => (el.innerText || '').trim())
+                .filter(t => t.length >= 6 && !t.includes('부동산R114') && !t.includes('부동산114'));
+
+            const title = headings.length > 0 ? headings[0] : (document.title || '');
+
+            // 2) 본문/헤더 영역 텍스트에서 YYYY.MM.DD 또는 YYYY-MM-DD 날짜 탐색
+            const container = document.querySelector('main, article') || document.body;
+            const bodyText = container ? container.innerText : '';
+            const m = bodyText.match(/(?<!\\d)(20\\d{2})[.\\-/년]\\s*(0?[1-9]|1[0-2])[.\\-/월]\\s*(0?[1-9]|[12]\\d|3[01])일?(?!\\d)/);
+            const date = m ? m[0] : '';
+
+            return { title, date };
+        }"""
+    )
+    return {
+        "title": clean_title_text(data.get("title", "")),
+        "date": data.get("date", "").strip(),
+    }
+
+
+def parse_pubdate(raw_date: str) -> str:
+    m4 = FULL_DATE_RE.search(raw_date or "")
     if m4:
         y, m, d = map(int, m4.groups())
         try:
             return format_datetime(datetime(y, m, d, 9, 0, 0, tzinfo=KST))
         except ValueError:
             pass
-
-    if fallback_rfc2822:
-        return fallback_rfc2822
-
     return format_datetime(datetime.now(KST))
 
 
+# ================= 3. RSS 2.0 빌드 =================
 def main():
+    from playwright.sync_api import sync_playwright
+
     out_path = Path(FEED_META["output_file"])
     existing_cache = load_existing_items(out_path)
 
@@ -276,40 +237,28 @@ def main():
 
     seen_guids = set()
 
-    for src in SOURCES:
-        items = collect_article_links(src)
-        print(f"[INFO] {src['id']}: 목록 링크 {len(items)}건 확보")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(locale="ko-KR", user_agent=HEADERS["User-Agent"])
 
-        for it in items:
-            guid_val = hashlib.sha256(it["link"].rstrip("/").encode("utf-8")).hexdigest()[:24]
-            if guid_val in seen_guids:
-                continue
-            seen_guids.add(guid_val)
+        for src in SOURCES:
+            items = collect_source_items(context, src, existing_cache)
+            print(f"[INFO] {src['id']}: {len(items)}건 처리 완료")
 
-            cached = existing_cache.get(guid_val, {})
-            title = it["title"] or cached.get("title", "")
-            raw_date = it["date"]
+            for it in items:
+                if it["guid"] in seen_guids:
+                    continue
+                seen_guids.add(it["guid"])
 
-            # 제목이 없거나(부동산114, 시리즈명 필터링됨) 날짜가 없으면 상세 페이지에서 정밀 보완
-            if not is_valid_title(title) or not raw_date:
-                detail_title, detail_date = fetch_detail_meta(it["link"])
-                if is_valid_title(detail_title):
-                    title = detail_title
-                if detail_date:
-                    raw_date = detail_date
+                item_el = ET.SubElement(channel, "item")
+                ET.SubElement(item_el, "title").text = f"[{src['category']}] {it['title']}"
+                ET.SubElement(item_el, "link").text = it["link"]
+                guid_el = ET.SubElement(item_el, "guid", isPermaLink="false")
+                guid_el.text = it["guid"]
+                ET.SubElement(item_el, "category").text = src["category"]
+                ET.SubElement(item_el, "pubDate").text = it["pubDate"]
 
-            if not is_valid_title(title):
-                title = f"부동산R114 {src['category']} 콘텐츠"
-
-            pub_date_str = parse_pubdate(raw_date, cached.get("pubDate"))
-
-            item_el = ET.SubElement(channel, "item")
-            ET.SubElement(item_el, "title").text = f"[{src['category']}] {title}"
-            ET.SubElement(item_el, "link").text = it["link"]
-            guid_el = ET.SubElement(item_el, "guid", isPermaLink="false")
-            guid_el.text = guid_val
-            ET.SubElement(item_el, "category").text = src["category"]
-            ET.SubElement(item_el, "pubDate").text = pub_date_str
+        browser.close()
 
     if not seen_guids:
         raise RuntimeError("수집된 게시글이 0건입니다. 페이지 구조를 확인하세요.")
