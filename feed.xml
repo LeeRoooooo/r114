@@ -5,7 +5,7 @@
     <link>https://r114.com/trends/issues</link>
     <description>부동산R114(r114.com) 트렌드 이슈 및 스토리 통합 RSS 피드</description>
     <language>ko</language>
-    <lastBuildDate>Mon, 16 Nov 2026 13:58:33 +0900</lastBuildDate>
+    <lastBuildDate>Mon, 16 Nov 2026 23:56:49 +0900</lastBuildDate>
     <item>
       <title>[이슈] 15층에서 47층으로, 방학신동아1단지 재건축 본격화</title>
       <link>https://r114.com/trends/issues/41a4a6fa-284b-8031-97b7-cdd2943dc6ca</link>
@@ -17,6 +17,20 @@
       <title>[이슈] 우리 동네 재건축 지도 - 분당 선도지구 4곳 한눈에</title>
       <link>https://r114.com/trends/issues/41a4a6fa-284b-81c3-a998-f27d87c9cdc1</link>
       <guid isPermaLink="false">2857532a4e2cfd1da7dba286</guid>
+      <category>이슈</category>
+      <pubDate>Mon, 16 Nov 2026 09:00:00 +0900</pubDate>
+    </item>
+    <item>
+      <title>[이슈] 용산국제업무지구 1만 가구 논란, 공급 규모는 결국 얼마?</title>
+      <link>https://r114.com/trends/issues/41a4a6fa-284b-8046-82ba-e2bb2a0466e5</link>
+      <guid isPermaLink="false">f3aa9c489274dec13cdfd0b2</guid>
+      <category>이슈</category>
+      <pubDate>Mon, 16 Nov 2026 09:00:00 +0900</pubDate>
+    </item>
+    <item>
+      <title>[이슈] 강남은 내렸는데 한강벨트는 올랐다? 서울 아파트 시장의 반전</title>
+      <link>https://r114.com/trends/issues/41a4a6fa-284b-8054-8a36-f746127fa718</link>
+      <guid isPermaLink="false">5a86ab140894360a5f329f49</guid>
       <category>이슈</category>
       <pubDate>Mon, 16 Nov 2026 09:00:00 +0900</pubDate>
     </item>
@@ -63,20 +77,6 @@
       <pubDate>Thu, 12 Nov 2026 09:00:00 +0900</pubDate>
     </item>
     <item>
-      <title>[이슈] 경기 광명 20억원 시대, 서울 영등포 아파트와 나란히</title>
-      <link>https://r114.com/trends/issues/4164a6fa-284b-804d-8ab5-e803de414b89</link>
-      <guid isPermaLink="false">42cba3d2c4849a036ac7e474</guid>
-      <category>이슈</category>
-      <pubDate>Thu, 12 Nov 2026 09:00:00 +0900</pubDate>
-    </item>
-    <item>
-      <title>[이슈] 잠실주공5단지, 65층 재건축 앞두고 중학교가 변수로?</title>
-      <link>https://r114.com/trends/issues/4154a6fa-284b-807b-b981-fc7fd4cfc8dc</link>
-      <guid isPermaLink="false">89b115cb95ecfc4c2ee19b1a</guid>
-      <category>이슈</category>
-      <pubDate>Wed, 11 Nov 2026 09:00:00 +0900</pubDate>
-    </item>
-    <item>
       <title>[스토리] 강남 개발이 바꾼 지하철 노선</title>
       <link>https://r114.com/trends/stories/41a4a6fa-284b-80c7-a604-c8ee5d955804</link>
       <guid isPermaLink="false">0bfdbce37c7251eac7704872</guid>
@@ -84,16 +84,16 @@
       <pubDate>Mon, 16 Nov 2026 09:00:00 +0900</pubDate>
     </item>
     <item>
-      <title>[스토리] 현대와 삼성이 갖지 못한 강남 초고층 빌딩</title>
-      <link>https://r114.com/trends/stories/4144a6fa-284b-802b-9e76-e4e56b890aa0</link>
-      <guid isPermaLink="false">0636194cb84ddc954a635769</guid>
+      <title>[스토리] 종로 땅 속에 숨겨진 600년의 비밀</title>
+      <link>https://r114.com/trends/stories/4144a6fa-284b-8031-b452-dedafc9fe324</link>
+      <guid isPermaLink="false">101061d3d555ebcdb016c43b</guid>
       <category>스토리</category>
       <pubDate>Tue, 10 Nov 2026 09:00:00 +0900</pubDate>
     </item>
     <item>
-      <title>[스토리] 종로 땅 속에 숨겨진 600년의 비밀</title>
-      <link>https://r114.com/trends/stories/4144a6fa-284b-8031-b452-dedafc9fe324</link>
-      <guid isPermaLink="false">101061d3d555ebcdb016c43b</guid>
+      <title>[스토리] 현대와 삼성이 갖지 못한 강남 초고층 빌딩</title>
+      <link>https://r114.com/trends/stories/4144a6fa-284b-802b-9e76-e4e56b890aa0</link>
+      <guid isPermaLink="false">0636194cb84ddc954a635769</guid>
       <category>스토리</category>
       <pubDate>Tue, 10 Nov 2026 09:00:00 +0900</pubDate>
     </item>
