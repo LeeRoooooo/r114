@@ -5,7 +5,7 @@
     <link>https://r114.com/trends/issues</link>
     <description>부동산R114(r114.com) 트렌드 이슈 및 스토리 통합 RSS 피드</description>
     <language>ko</language>
-    <lastBuildDate>Thu, 26 Nov 2026 12:58:18 +0900</lastBuildDate>
+    <lastBuildDate>Thu, 26 Nov 2026 22:44:11 +0900</lastBuildDate>
     <item>
       <title>[이슈] 공공기관도 전세사기 피해? 보증금 2억원 지급했는데 집주인 잠적</title>
       <link>https://r114.com/trends/issues/4244a6fa-284b-805e-a4ee-cb8d47b5f2ab</link>
@@ -35,6 +35,27 @@
       <pubDate>Thu, 26 Nov 2026 09:00:00 +0900</pubDate>
     </item>
     <item>
+      <title>[이슈] ‘연제갤러리자이’ 청약 667건 몰렸는데 무순위 315가구?</title>
+      <link>https://r114.com/trends/issues/4244a6fa-284b-8031-a054-ed63c5b2a5cb</link>
+      <guid isPermaLink="false">e1d857cc5d9932a17f125279</guid>
+      <category>이슈</category>
+      <pubDate>Thu, 26 Nov 2026 09:00:00 +0900</pubDate>
+    </item>
+    <item>
+      <title>[이슈] ‘매교역 팰루시드’ 9억원도 비싸다더니 11억원 돌파</title>
+      <link>https://r114.com/trends/issues/4244a6fa-284b-8016-b6d6-c1800d002742</link>
+      <guid isPermaLink="false">d390c20767632ff60ca61842</guid>
+      <category>이슈</category>
+      <pubDate>Thu, 26 Nov 2026 09:00:00 +0900</pubDate>
+    </item>
+    <item>
+      <title>[이슈] 2027년 수도권 공공주택 5.6만호 입주자 모집, 최근 5년 평균의 2배</title>
+      <link>https://r114.com/trends/issues/4244a6fa-284b-8001-9bb6-dd1678d0bfee</link>
+      <guid isPermaLink="false">367227350a69c7bcf3818d3e</guid>
+      <category>이슈</category>
+      <pubDate>Thu, 26 Nov 2026 09:00:00 +0900</pubDate>
+    </item>
+    <item>
       <title>[이슈] 전주역·창원중앙역에 9천억원 개발…두 도시 어떻게 달라질까?</title>
       <link>https://r114.com/trends/issues/4234a6fa-284b-80cf-b88b-ef836aeb67be</link>
       <guid isPermaLink="false">0d3996675a47c71d1b3e4a20</guid>
@@ -56,25 +77,11 @@
       <pubDate>Wed, 25 Nov 2026 09:00:00 +0900</pubDate>
     </item>
     <item>
-      <title>[이슈] 더현대·신세계·스타필드까지…광주에 대형 복합쇼핑몰 3곳이 들어선다?</title>
-      <link>https://r114.com/trends/issues/4234a6fa-284b-8012-9bee-c7c8ac1f3ca7</link>
-      <guid isPermaLink="false">eed4cadbc97125fac8b23262</guid>
-      <category>이슈</category>
-      <pubDate>Wed, 25 Nov 2026 09:00:00 +0900</pubDate>
-    </item>
-    <item>
-      <title>[이슈] 44년 된 양평동 신동아, 용적률 400%로 재건축 속도</title>
-      <link>https://r114.com/trends/issues/4224a6fa-284b-80fe-8639-e4b24c178f9f</link>
-      <guid isPermaLink="false">f07c461886f9e3aefda2a630</guid>
-      <category>이슈</category>
-      <pubDate>Wed, 25 Nov 2026 09:00:00 +0900</pubDate>
-    </item>
-    <item>
-      <title>[이슈] 43년 된 송파한양1차, 112일 만에 재건축 조합설립 완료</title>
-      <link>https://r114.com/trends/issues/4234a6fa-284b-80fd-a71a-c7aedc6964f5</link>
-      <guid isPermaLink="false">ac2a66191b5a8069ce5d92b4</guid>
-      <category>이슈</category>
-      <pubDate>Wed, 25 Nov 2026 09:00:00 +0900</pubDate>
+      <title>[스토리] 서울역 1번 출구에는 사라진 기차역이 있다</title>
+      <link>https://r114.com/trends/stories/4244a6fa-284b-80ca-a4bd-d8541cf8216d</link>
+      <guid isPermaLink="false">69c5cce6da5e298a9a2b1e08</guid>
+      <category>스토리</category>
+      <pubDate>Thu, 26 Nov 2026 09:00:00 +0900</pubDate>
     </item>
     <item>
       <title>[스토리] 한때 미분양이던 은마, 강남 재건축의 상징이 되다</title>
@@ -131,13 +138,6 @@
       <guid isPermaLink="false">0636194cb84ddc954a635769</guid>
       <category>스토리</category>
       <pubDate>Tue, 10 Nov 2026 09:00:00 +0900</pubDate>
-    </item>
-    <item>
-      <title>[스토리] 500억 보상 합의에도 재개발에서 제외된 사랑제일교회</title>
-      <link>https://r114.com/trends/stories/40f4a6fa-284b-80dc-83f1-df14b8e74ea0</link>
-      <guid isPermaLink="false">0dd54a6d068a5a2bbac2d037</guid>
-      <category>스토리</category>
-      <pubDate>Thu, 05 Nov 2026 09:00:00 +0900</pubDate>
     </item>
   </channel>
 </rss>
